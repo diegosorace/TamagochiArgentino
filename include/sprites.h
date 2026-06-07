@@ -36,7 +36,7 @@
 // ============================================================
 // SPRITE: Piquetero feliz (idle frame 1)
 // ============================================================
-const uint16_t SPRITE_FELIZ_1[SPRITE_H][SPRITE_W] PROGMEM = {
+const uint16_t SPRITE_FELIZ_1[SPRITE_H][SPRITE_W] = {
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_M,_M,_M,_M,_M,_M,_M,_M,_M,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_M,_M,_M,_M,_M,_M,_M,_M,_M,_M,_M,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
@@ -74,7 +74,7 @@ const uint16_t SPRITE_FELIZ_1[SPRITE_H][SPRITE_W] PROGMEM = {
 // ============================================================
 // SPRITE: Piquetero feliz (idle frame 2 — leve movimiento)
 // ============================================================
-const uint16_t SPRITE_FELIZ_2[SPRITE_H][SPRITE_W] PROGMEM = {
+const uint16_t SPRITE_FELIZ_2[SPRITE_H][SPRITE_W] = {
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_M,_M,_M,_M,_M,_M,_M,_M,_M,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_M,_M,_M,_M,_M,_M,_M,_M,_M,_M,_M,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
@@ -112,7 +112,7 @@ const uint16_t SPRITE_FELIZ_2[SPRITE_H][SPRITE_W] PROGMEM = {
 // ============================================================
 // SPRITE: Piquetero enojado (estado medio)
 // ============================================================
-const uint16_t SPRITE_ENOJADO[SPRITE_H][SPRITE_W] PROGMEM = {
+const uint16_t SPRITE_ENOJADO[SPRITE_H][SPRITE_W] = {
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_M,_M,_M,_M,_M,_M,_M,_M,_M,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_M,_M,_M,_M,_M,_M,_M,_M,_M,_M,_M,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
@@ -154,7 +154,7 @@ const uint16_t SPRITE_ENOJADO[SPRITE_H][SPRITE_W] PROGMEM = {
 // ============================================================
 // SPRITE: Piquetero triste (tirado en el piso)
 // ============================================================
-const uint16_t SPRITE_TRISTE[SPRITE_H][SPRITE_W] PROGMEM = {
+const uint16_t SPRITE_TRISTE[SPRITE_H][SPRITE_W] = {
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
@@ -196,7 +196,7 @@ const uint16_t SPRITE_TRISTE[SPRITE_H][SPRITE_W] PROGMEM = {
 // ============================================================
 // SPRITE: Piquetero muerto (XX en los ojos)
 // ============================================================
-const uint16_t SPRITE_MUERTO[SPRITE_H][SPRITE_W] PROGMEM = {
+const uint16_t SPRITE_MUERTO[SPRITE_H][SPRITE_W] = {
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
@@ -239,7 +239,7 @@ const uint16_t SPRITE_MUERTO[SPRITE_H][SPRITE_W] PROGMEM = {
 // ============================================================
 // SPRITE: Piquetero comiendo (choripán en mano)
 // ============================================================
-const uint16_t SPRITE_COMIENDO[SPRITE_H][SPRITE_W] PROGMEM = {
+const uint16_t SPRITE_COMIENDO[SPRITE_H][SPRITE_W] = {
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_M,_M,_M,_M,_M,_M,_M,_M,_M,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_M,_M,_M,_M,_M,_M,_M,_M,_M,_M,_M,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
@@ -280,7 +280,7 @@ const uint16_t SPRITE_COMIENDO[SPRITE_H][SPRITE_W] PROGMEM = {
 // ============================================================
 // SPRITE: Piquetero durmiendo (Zzz)
 // ============================================================
-const uint16_t SPRITE_DURMIENDO[SPRITE_H][SPRITE_W] PROGMEM = {
+const uint16_t SPRITE_DURMIENDO[SPRITE_H][SPRITE_W] = {
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     {_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T,_T},
     // Zzz flotando

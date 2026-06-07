@@ -4,75 +4,77 @@ Un Tamagotchi para ESP32-C6 con pantalla táctil LCD IPS 1.47" (172×320px), pro
 
 ---
 
-## Hardware
+## Hardware confirmado
 
 | Componente | Detalle |
 |---|---|
 | Microcontrolador | ESP32-C6 (devkitc-1) |
 | Pantalla | LCD IPS 1.47" — 172×320px |
-| Driver de pantalla | **ST7789** (compatible GC9107 en modo ST7789) |
-| Touch | CST816S capacitivo (I2C, addr `0x15`) |
+| Driver de pantalla | **ST7789** — `Arduino_GFX_Library` |
+| Touch | **AXS5106L** capacitivo (I2C) |
 | Framework | Arduino via PlatformIO |
-| Librería gráfica | [LovyanGFX](https://github.com/lovyan03/LovyanGFX) |
-
-### ¿Por qué ST7789 y no GC9107?
-
-La pantalla de 172×320 es un formato poco común que usan módulos económicos chinos. El IC puede ser GC9107 o ST7789V3 según el fabricante. LovyanGFX con el driver `Panel_ST7789` funciona con ambos porque:
-
-- GC9107 responde al mismo set de comandos que ST7789 en su modo de compatibilidad.
-- Si el panel no enciende o muestra colores incorrectos, probar con `invert = false` y ajustar `offset_x` a `0` o `34`.
 
 ---
 
-## Pines de conexión
-
-> ⚠️ Estos pines son los más comunes para módulos ESP32-C6 + pantalla 1.47". **Verificar con el esquemático de tu módulo específico** — algunos integran todo en una misma placa y los pines están fijos.
+## Pines (verificados en hardware real)
 
 ### Pantalla (SPI)
 
-| Señal | Pin ESP32-C6 | Definido en |
-|---|---|---|
-| MOSI | GPIO 6 | `PIN_TFT_MOSI` |
-| SCLK | GPIO 4 | `PIN_TFT_SCLK` |
-| CS | GPIO 14 | `PIN_TFT_CS` |
-| DC | GPIO 15 | `PIN_TFT_DC` |
-| RST | GPIO 21 | `PIN_TFT_RST` |
-| BL (backlight) | GPIO 22 | `PIN_TFT_BL` |
+| Señal | GPIO |
+|---|---|
+| MOSI | 2 |
+| SCK | 1 |
+| CS | 14 |
+| DC | 15 |
+| RST | 22 |
+| Backlight | 23 |
 
-### Touch CST816S (I2C)
+### Touch AXS5106L (I2C)
 
-| Señal | Pin ESP32-C6 | Definido en |
-|---|---|---|
-| SDA | GPIO 2 | `PIN_TOUCH_SDA` |
-| SCL | GPIO 3 | `PIN_TOUCH_SCL` |
-| INT | GPIO 1 | `PIN_TOUCH_INT` |
+| Señal | GPIO |
+|---|---|
+| SDA | 18 |
+| SCL | 19 |
+| RST | 20 |
+| INT | 21 |
 
-Cambiar los pines en `include/config_pantalla.h`.
+Todos los pines se definen en `include/config_pantalla.h`.
+
+---
+
+## Librería gráfica
+
+Se usa **Arduino_GFX_Library** (igual que el proyecto JARVIS que ya funciona en el mismo hardware). La configuración de la pantalla incluye la secuencia de init de registros custom (`lcd_reg_init()`) y el offset de columnas en 34.
+
+```cpp
+Arduino_DataBus* bus = new Arduino_HWSPI(PIN_DC, PIN_CS, PIN_SCK, PIN_MOSI);
+Arduino_GFX* gfx = new Arduino_ST7789(bus, PIN_RST, 0, false, 172, 320, 34, 0, 34, 0);
+```
 
 ---
 
 ## Mecánicas del juego
 
-El Piquetero tiene 3 stats que bajan con el tiempo (1 punto por minuto en modo normal):
+El Piquetero tiene 3 stats que bajan con el tiempo:
 
-| Stat | Color | Acción para subir |
+| Stat | Color | Acción |
 |---|---|---|
-| 🍖 **Hambre** | Naranja | Botón "Comer" (+30, choripán) |
-| ✊ **Ánimo** | Verde | Botón "Jugar" (+25, picar calle) |
-| 😴 **Energía** | Azul | Botón "Dormir" (+40, siesta obrera) |
+| 🍖 Hambre | Naranja | "Comer" (+30) |
+| ✊ Ánimo | Verde | "Jugar" (+25) |
+| 😴 Energía | Azul | "Dormir" (+40) |
 
 ### Estados visuales
 
 | Estado | Condición |
 |---|---|
-| Feliz (idle animado) | Todos los stats > 66% |
-| Enojado (brazos arriba) | Stats más bajo entre 33–66% |
-| Triste (tirado) | Stats más bajo < 33% |
-| Muerto (XX en ojos) | Cualquier stat llega a 0 |
-| Comiendo | Durante 2s tras pulsar "Comer" |
-| Durmiendo | Durante 2s tras pulsar "Dormir" |
+| Feliz (idle animado) | Stats mínimo > 66% |
+| Enojado (brazos arriba) | Stats mínimo 33–66% |
+| Triste (tirado) | Stats mínimo < 33% |
+| Muerto (XX en ojos) | Cualquier stat = 0 |
+| Comiendo | 2s tras pulsar "Comer" |
+| Durmiendo | 2s tras pulsar "Dormir" |
 
-Para resucitar al piquetero muerto: tocar cualquier botón.
+Tocar cualquier botón resucita al piquetero muerto.
 
 ---
 
@@ -80,16 +82,16 @@ Para resucitar al piquetero muerto: tocar cualquier botón.
 
 ```
 TamagochiArgentino/
-├── platformio.ini          ← Configuración PlatformIO
+├── platformio.ini          ← Arduino_GFX_Library, ESP32-C6
 ├── include/
-│   ├── config_pantalla.h   ← Clase LGFX_Piquetero (pines + driver ST7789)
-│   ├── sprites.h           ← Arrays uint16_t RGB565 de los sprites
-│   ├── piquetero.h         ← Interfaz de lógica (stats, estados, acciones)
+│   ├── config_pantalla.h   ← Pines, init de registros, instancias GFX
+│   ├── sprites.h           ← Arrays uint16_t RGB565 (32x32px, 6 sprites)
+│   ├── piquetero.h         ← Lógica del Tamagotchi
 │   └── pantalla.h          ← Interfaz de renderizado y touch
 └── src/
-    ├── main.cpp            ← setup() + loop() (orquestación)
-    ├── piquetero.cpp       ← Lógica del Tamagotchi
-    └── pantalla.cpp        ← Renderizado LovyanGFX + touch CST816S
+    ├── main.cpp            ← setup() + loop()
+    ├── piquetero.cpp       ← Stats, estados, acciones
+    └── pantalla.cpp        ← Arduino_GFX + AXS5106L I2C
 ```
 
 ---
@@ -97,53 +99,29 @@ TamagochiArgentino/
 ## Cómo compilar y subir
 
 ```bash
-# Instalar PlatformIO CLI si no lo tenés
-pip install platformio
+git clone https://github.com/diegosorace/TamagochiArgentino.git
+cd TamagochiArgentino
+git checkout claude/modest-pascal-J0I4w
 
-# Compilar
-pio run
-
-# Compilar y subir (reemplazar /dev/ttyUSB0 con tu puerto)
-pio run -t upload --upload-port /dev/ttyUSB0
+# Compilar y subir
+pio run -t upload --upload-port /dev/ttyUSB0   # Linux/Mac
+pio run -t upload --upload-port COM3            # Windows
 
 # Monitor serie
 pio device monitor -b 115200
 ```
 
-En Arduino IDE: instalar la librería `LovyanGFX` desde el gestor de librerías y copiar los archivos de `src/` e `include/` a tu sketch.
-
 ---
 
-## Ajuste fino de la pantalla
+## Próximas features
 
-Si la imagen se ve desplazada o con colores incorrectos, en `include/config_pantalla.h` modificar:
-
-```cpp
-cfg.offset_x  = 34;   // probar 0 o 34 según módulo
-cfg.offset_y  = 0;
-cfg.invert    = true;  // probar false si los colores están invertidos
-```
-
-Para cambiar la velocidad de decremento de stats (más rápido = más difícil), en `include/piquetero.h`:
-
-```cpp
-#define DECREMENTO_HAMBRE   2   // puntos por minuto
-#define DECREMENTO_ANIMO    1
-#define DECREMENTO_ENERGIA  1
-```
-
----
-
-## Próximas features (arquitectura preparada)
-
-- **WiFi**: dólar blue, clima y resultados de River/Boca afectan los stats
+- **WiFi**: dólar blue, clima y resultados de fútbol afectan los stats
 - **Más personajes**: el Mate, el León, el Dólar Blue
 - **Evolución**: el piquetero mejora si lo cuidás bien durante X días
-- **Sonido**: buzzer para eventos importantes
 - **Persistencia**: guardar stats en NVS al apagar
 
 ---
 
 ## Licencia
 
-MIT — Usalo, modificalo, distribuilo. La cultura argentina es de todos.
+MIT — La cultura argentina es de todos.

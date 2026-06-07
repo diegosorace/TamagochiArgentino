@@ -1,42 +1,49 @@
 // ============================================================
-// pantalla.cpp — Renderizado en LovyanGFX + touch CST816S
+// pantalla.cpp — Renderizado con Arduino_GFX + touch AXS5106L
 // ============================================================
 
 #include "pantalla.h"
 #include "sprites.h"
-#include <Wire.h>
-
-// Instancia global de la pantalla (declarada extern en config_pantalla.h)
-LGFX_Piquetero pantalla;
 
 // ------------------------------------------------------------
-// Touch CST816S — registros básicos por I2C
+// Instancias globales del bus y pantalla (declaradas extern en config_pantalla.h)
+// Misma configuración que el proyecto JARVIS
 // ------------------------------------------------------------
-static const uint8_t CST816S_FINGER_NUM = 0x02;
-static const uint8_t CST816S_XPOS_H     = 0x03;
-static const uint8_t CST816S_YPOS_H     = 0x05;
+Arduino_DataBus* bus = new Arduino_HWSPI(PIN_DC, PIN_CS, PIN_SCK, PIN_MOSI);
 
+Arduino_GFX* gfx = new Arduino_ST7789(
+    bus, PIN_RST,
+    0,      // rotation
+    false,  // IPS
+    172,    // width
+    320,    // height
+    34,     // col_offset1 (confirmado en JARVIS)
+    0,      // row_offset1
+    34,     // col_offset2
+    0       // row_offset2
+);
+
+// ------------------------------------------------------------
+// Touch AXS5106L — protocolo I2C
+// Registros: [0]=gesture, [1]=count, [2]=xH, [3]=xL, [4]=yH, [5]=yL
+// ------------------------------------------------------------
 bool Pantalla::_leerTouchRaw(int16_t& tx, int16_t& ty) {
     Wire.beginTransmission(TOUCH_I2C_ADDR);
-    Wire.write(CST816S_FINGER_NUM);
+    Wire.write(0x00);
     if (Wire.endTransmission(false) != 0) return false;
 
-    Wire.requestFrom((uint8_t)TOUCH_I2C_ADDR, (uint8_t)7);
-    if (Wire.available() < 7) return false;
+    Wire.requestFrom((uint8_t)TOUCH_I2C_ADDR, (uint8_t)6);
+    if (Wire.available() < 6) return false;
 
-    uint8_t fingers = Wire.read();  // registro 0x02
-    Wire.read();                    // 0x03 high X
-    uint8_t xH = Wire.read() & 0x0F;
-    uint8_t xL = Wire.read();       // 0x04 low X
-    Wire.read();                    // 0x05 high Y
-    uint8_t yH = Wire.read() & 0x0F;
-    uint8_t yL = Wire.read();       // 0x06 low Y
+    uint8_t buf[6];
+    for (int i = 0; i < 6; i++) buf[i] = Wire.read();
 
-    if (fingers == 0) return false;
+    uint8_t count = buf[1] & 0x0F;
+    if (count == 0) return false;
 
-    tx = ((int16_t)xH << 8) | xL;
-    ty = ((int16_t)yH << 8) | yL;
-    return true;
+    tx = ((int16_t)(buf[2] & 0x0F) << 8) | buf[3];
+    ty = ((int16_t)(buf[4] & 0x0F) << 8) | buf[5];
+    return (tx < ANCHO && ty < ALTO);
 }
 
 bool Pantalla::_tocandoBoton(int16_t tx, int16_t ty, int id) {
@@ -52,30 +59,42 @@ bool Pantalla::_tocandoBoton(int16_t tx, int16_t ty, int id) {
 }
 
 // ------------------------------------------------------------
-// Inicialización
+// Inicialización (igual que JARVIS)
 // ------------------------------------------------------------
-
 void Pantalla::iniciar() {
-    // I2C para touch
     Wire.begin(PIN_TOUCH_SDA, PIN_TOUCH_SCL);
     Wire.setClock(400000);
 
+    // Reset del touch
+    pinMode(PIN_TOUCH_RST, OUTPUT);
+    digitalWrite(PIN_TOUCH_RST, LOW);
+    delay(10);
+    digitalWrite(PIN_TOUCH_RST, HIGH);
+    delay(50);
+
     // Pantalla
-    pantalla.init();
-    pantalla.setRotation(0);    // portrait
-    pantalla.setBrightness(200);
-    pantalla.fillScreen(COLOR_FONDO);
+    if (!gfx->begin()) {
+        Serial.println("ERROR: no se pudo iniciar la pantalla");
+        while (1);
+    }
+    lcd_reg_init();
+
+    // Backlight
+    pinMode(PIN_BL, OUTPUT);
+    digitalWrite(PIN_BL, HIGH);
+
+    gfx->fillScreen(COLOR_FONDO);
+    gfx->invertDisplay(true);  // igual que JARVIS
 
     _dibujarFondo();
     _dibujarBotones();
 }
 
 // ------------------------------------------------------------
-// Dibujar todo (primer render o tras cambio total)
+// Render completo
 // ------------------------------------------------------------
-
 void Pantalla::dibujarTodo(const Piquetero& piq) {
-    pantalla.fillScreen(COLOR_FONDO);
+    gfx->fillScreen(COLOR_FONDO);
     _dibujarFondo();
     _dibujarSprite(piq.estado());
     actualizarBarras(piq.stats());
@@ -83,42 +102,37 @@ void Pantalla::dibujarTodo(const Piquetero& piq) {
 }
 
 // ------------------------------------------------------------
-// Actualizar solo el sprite (animación idle)
+// Animación idle del sprite
 // ------------------------------------------------------------
-
 void Pantalla::actualizarSprite(const Piquetero& piq) {
-    // Alternar frames idle cada 600ms
     if (millis() - _ultimoFrame > 600) {
         _frameIdle = !_frameIdle;
         _ultimoFrame = millis();
     }
-    // Limpiar área del sprite antes de redibujar
-    pantalla.fillRect(SPRITE_X - 4, SPRITE_Y - 4,
-                      SPRITE_W + 8, SPRITE_H + 8, COLOR_FONDO);
+    // Limpiar área del sprite
+    gfx->fillRect(SPRITE_X - 2, SPRITE_Y - 2,
+                  SPRITE_W * ESCALA + 4, SPRITE_H * ESCALA + 4, COLOR_FONDO);
     _dibujarSprite(piq.estado(), _frameIdle == 1);
 }
 
 // ------------------------------------------------------------
-// Actualizar barras de stats
+// Barras de stats
 // ------------------------------------------------------------
-
 void Pantalla::actualizarBarras(const Stats& stats) {
     _dibujarBarra(BARRA_X, BARRA_Y_HAMBRE,  BARRA_W, BARRA_H,
                   stats.hambre,  COLOR_BARRA_HAMBRE,  "Hambre");
     _dibujarBarra(BARRA_X, BARRA_Y_ANIMO,   BARRA_W, BARRA_H,
-                  stats.animo,   COLOR_BARRA_ANIMO,   "Animo ");
+                  stats.animo,   COLOR_BARRA_ANIMO,   "Animo");
     _dibujarBarra(BARRA_X, BARRA_Y_ENERGIA, BARRA_W, BARRA_H,
-                  stats.energia, COLOR_BARRA_ENERGIA, "Energi");
+                  stats.energia, COLOR_BARRA_ENERGIA, "Energ");
 }
 
 // ------------------------------------------------------------
 // Touch
 // ------------------------------------------------------------
-
 int Pantalla::leerBoton() {
     int16_t tx, ty;
     if (!_leerTouchRaw(tx, ty)) return BTN_NINGUNO;
-
     for (int i = 0; i < 3; i++) {
         if (_tocandoBoton(tx, ty, i)) return i;
     }
@@ -126,8 +140,7 @@ int Pantalla::leerBoton() {
 }
 
 void Pantalla::destacarBoton(int id) {
-    int16_t bx;
-    const char* txt;
+    int16_t bx; const char* txt;
     switch (id) {
         case BTN_ALIMENTAR: bx = BOTON_1_X; txt = "Comer";  break;
         case BTN_JUGAR:     bx = BOTON_2_X; txt = "Jugar";  break;
@@ -138,8 +151,7 @@ void Pantalla::destacarBoton(int id) {
 }
 
 void Pantalla::restaurarBoton(int id) {
-    int16_t bx;
-    const char* txt;
+    int16_t bx; const char* txt;
     switch (id) {
         case BTN_ALIMENTAR: bx = BOTON_1_X; txt = "Comer";  break;
         case BTN_JUGAR:     bx = BOTON_2_X; txt = "Jugar";  break;
@@ -150,126 +162,108 @@ void Pantalla::restaurarBoton(int id) {
 }
 
 // ------------------------------------------------------------
-// Mensaje de feedback
+// Mensajes
 // ------------------------------------------------------------
-
 void Pantalla::mostrarMensaje(const char* msg, uint16_t color) {
-    // Zona de mensaje entre sprite y barras
-    pantalla.fillRect(0, 155, ANCHO, 20, COLOR_FONDO);
-    pantalla.setTextColor(color);
-    pantalla.setTextSize(1);
-    pantalla.setCursor((ANCHO - strlen(msg) * 6) / 2, 158);
-    pantalla.print(msg);
+    gfx->fillRect(0, 163, ANCHO, 20, COLOR_FONDO);
+    gfx->setTextColor(color);
+    gfx->setTextSize(1);
+    int16_t cx = (ANCHO - (int16_t)(strlen(msg) * 6)) / 2;
+    gfx->setCursor(max((int16_t)0, cx), 166);
+    gfx->print(msg);
 }
 
 void Pantalla::limpiarMensaje() {
-    pantalla.fillRect(0, 155, ANCHO, 20, COLOR_FONDO);
+    gfx->fillRect(0, 163, ANCHO, 20, COLOR_FONDO);
 }
 
 // ------------------------------------------------------------
-// Privados — dibujo
+// Privados — fondo y encabezado
 // ------------------------------------------------------------
-
 void Pantalla::_dibujarFondo() {
-    // Título arriba
-    pantalla.setTextColor(0xFFE0);  // amarillo
-    pantalla.setTextSize(1);
-    pantalla.setCursor(30, 8);
-    pantalla.print("TAMAGOTCHI ARGENTINO");
+    gfx->setTextColor(0xFFE0);   // amarillo
+    gfx->setTextSize(1);
+    gfx->setCursor(18, 8);
+    gfx->print("TAMAGOTCHI ARGENTINO");
 
-    // Subtítulo
-    pantalla.setTextColor(0x8410);  // gris
-    pantalla.setCursor(52, 20);
-    pantalla.print("El Piquetero");
+    gfx->setTextColor(0x8410);   // gris
+    gfx->setCursor(52, 20);
+    gfx->print("El Piquetero");
 
-    // Línea separadora
-    pantalla.drawLine(0, 30, ANCHO, 30, 0x4208);
+    gfx->drawLine(0, 30, ANCHO, 30, 0x4208);
 
-    // Etiqueta de stats
-    pantalla.setTextColor(0xAD75);
-    pantalla.setCursor(BARRA_X, 168);
-    pantalla.print("Stats:");
+    gfx->setTextColor(0xAD75);
+    gfx->setCursor(BARRA_X, 178);
+    gfx->print("Stats:");
 }
 
+// ------------------------------------------------------------
+// Selector de sprite según estado
+// ------------------------------------------------------------
 void Pantalla::_dibujarSprite(EstadoPiquetero estado, bool frame2) {
     const uint16_t (*sprite)[SPRITE_W] = nullptr;
-
     switch (estado) {
-        case EstadoPiquetero::FELIZ:
-            sprite = frame2 ? SPRITE_FELIZ_2 : SPRITE_FELIZ_1;
-            break;
-        case EstadoPiquetero::ENOJADO:
-            sprite = SPRITE_ENOJADO;
-            break;
-        case EstadoPiquetero::TRISTE:
-            sprite = SPRITE_TRISTE;
-            break;
-        case EstadoPiquetero::MUERTO:
-            sprite = SPRITE_MUERTO;
-            break;
-        case EstadoPiquetero::COMIENDO:
-            sprite = SPRITE_COMIENDO;
-            break;
-        case EstadoPiquetero::DURMIENDO:
-            sprite = SPRITE_DURMIENDO;
-            break;
-        default:
-            sprite = SPRITE_FELIZ_1;
-            break;
+        case EstadoPiquetero::FELIZ:      sprite = frame2 ? SPRITE_FELIZ_2 : SPRITE_FELIZ_1; break;
+        case EstadoPiquetero::ENOJADO:    sprite = SPRITE_ENOJADO;   break;
+        case EstadoPiquetero::TRISTE:     sprite = SPRITE_TRISTE;    break;
+        case EstadoPiquetero::MUERTO:     sprite = SPRITE_MUERTO;    break;
+        case EstadoPiquetero::COMIENDO:   sprite = SPRITE_COMIENDO;  break;
+        case EstadoPiquetero::DURMIENDO:  sprite = SPRITE_DURMIENDO; break;
+        default:                          sprite = SPRITE_FELIZ_1;   break;
     }
-
-    if (sprite) _dibujarSpritePixel(sprite, SPRITE_X, SPRITE_Y);
+    if (sprite) _dibujarSpriteData(sprite, SPRITE_X, SPRITE_Y);
 }
 
-void Pantalla::_dibujarSpritePixel(const uint16_t sprite[SPRITE_H][SPRITE_W],
-                                   int16_t px, int16_t py) {
-    // Escala 3x para que el sprite de 32x32 ocupe ~96x96 px
-    // y sea visible en la pantalla de 172px de ancho
-    const uint8_t escala = 3;
-
+// ------------------------------------------------------------
+// Dibuja un sprite 32x32 escalado a ESCALA px por pixel
+// Salta píxeles transparentes (magenta 0xF81F)
+// ------------------------------------------------------------
+void Pantalla::_dibujarSpriteData(const uint16_t sprite[][SPRITE_W],
+                                  int16_t px, int16_t py) {
     for (int y = 0; y < SPRITE_H; y++) {
         for (int x = 0; x < SPRITE_W; x++) {
-            uint16_t color = pgm_read_word(&sprite[y][x]);
+            uint16_t color = sprite[y][x];
             if (color == TRANSPARENTE) continue;
-            pantalla.fillRect(px + x * escala, py + y * escala,
-                              escala, escala, color);
+            gfx->fillRect(px + x * ESCALA, py + y * ESCALA,
+                          ESCALA, ESCALA, color);
         }
     }
 }
 
+// ------------------------------------------------------------
+// Barra de stat con etiqueta y número
+// ------------------------------------------------------------
 void Pantalla::_dibujarBarra(int16_t x, int16_t y, int16_t w, int16_t h,
                               uint8_t valor, uint16_t color,
                               const char* etiqueta) {
-    // Etiqueta
-    pantalla.setTextColor(0xC618);
-    pantalla.setTextSize(1);
-    pantalla.setCursor(x, y - 1);
-    pantalla.print(etiqueta);
-    pantalla.print(":");
+    gfx->setTextColor(0xC618);
+    gfx->setTextSize(1);
+    gfx->setCursor(x, y);
+    gfx->print(etiqueta);
+    gfx->print(":");
 
-    int16_t barX = x + 46;
-    int16_t barW = w - 46;
+    int16_t barX = x + 40;
+    int16_t barW = w - 52;
 
-    // Fondo de la barra
-    pantalla.fillRoundRect(barX, y, barW, h, 3, COLOR_BARRA_FONDO);
+    gfx->fillRoundRect(barX, y, barW, h, 3, COLOR_BARRA_FONDO);
 
-    // Relleno proporcional al valor
     int16_t relleno = (int16_t)((long)barW * valor / 100);
     if (relleno > 0) {
-        // Color de alerta si está muy bajo
-        uint16_t colorBarra = (valor < 30) ? COLOR_ALERTA : color;
-        pantalla.fillRoundRect(barX, y, relleno, h, 3, colorBarra);
+        uint16_t c = (valor < 30) ? COLOR_ALERTA : color;
+        gfx->fillRoundRect(barX, y, relleno, h, 3, c);
     }
+    gfx->drawRoundRect(barX, y, barW, h, 3, 0x8410);
 
-    // Borde
-    pantalla.drawRoundRect(barX, y, barW, h, 3, 0x8410);
-
-    // Número
-    pantalla.setTextColor(0xFFFF);
-    pantalla.setCursor(barX + barW + 3, y);
-    pantalla.printf("%3d", valor);
+    gfx->setTextColor(0xFFFF);
+    char buf[5];
+    snprintf(buf, sizeof(buf), "%3d", valor);
+    gfx->setCursor(barX + barW + 3, y);
+    gfx->print(buf);
 }
 
+// ------------------------------------------------------------
+// Botones táctiles
+// ------------------------------------------------------------
 void Pantalla::_dibujarBotones() {
     _dibujarBoton(BOTON_1_X, BOTON_Y, BOTON_W, BOTON_H, "Comer",  COLOR_BOTON);
     _dibujarBoton(BOTON_2_X, BOTON_Y, BOTON_W, BOTON_H, "Jugar",  COLOR_BOTON);
@@ -278,14 +272,12 @@ void Pantalla::_dibujarBotones() {
 
 void Pantalla::_dibujarBoton(int16_t x, int16_t y, int16_t w, int16_t h,
                               const char* texto, uint16_t colorFondo) {
-    pantalla.fillRoundRect(x, y, w, h, 6, colorFondo);
-    pantalla.drawRoundRect(x, y, w, h, 6, 0x8410);
-
-    pantalla.setTextColor(COLOR_BOTON_TEXTO);
-    pantalla.setTextSize(1);
-    // Centrar texto en el botón
+    gfx->fillRoundRect(x, y, w, h, 6, colorFondo);
+    gfx->drawRoundRect(x, y, w, h, 6, 0x8410);
+    gfx->setTextColor(COLOR_BOTON_TEXTO);
+    gfx->setTextSize(1);
     int16_t tx = x + (w - (int16_t)(strlen(texto) * 6)) / 2;
     int16_t ty = y + (h - 8) / 2;
-    pantalla.setCursor(tx, ty);
-    pantalla.print(texto);
+    gfx->setCursor(tx, ty);
+    gfx->print(texto);
 }
